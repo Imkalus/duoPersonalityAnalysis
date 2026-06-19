@@ -10,29 +10,29 @@ MBTI 双人测试 Web 应用 — two users join a room, complete a 7-point Liker
 
 ```bash
 # Install dependencies
-pnpm install
+bun install
 
 # Run both client and server in development mode
-pnpm dev
+bun dev
 
 # Run individually
-pnpm dev:server   # Express + Socket.IO on :3000
-pnpm dev:client   # Vite + React on :5173 (proxies /api and /socket.io to :3000)
+bun dev:server   # Express + Socket.IO on :3000
+bun dev:client   # Vite + React on :5173 (proxies /api and /socket.io to :3000)
 
 # Build for production
-pnpm build
+bun build
 
 # Run tests (runs across all packages)
-pnpm test
+bun test
 
 # Run tests for a specific package
-pnpm --filter @mbti-duo/client test
-pnpm --filter @mbti-duo/server test
+bun run --filter @mbti-duo/client test
+bun run --filter @mbti-duo/server test
 ```
 
 ## Architecture
 
-### Monorepo (pnpm workspaces)
+### Monorepo (bun workspaces)
 
 - `client/` — React 19 + Vite + Tailwind CSS v4 (frontend)
 - `server/` — Express 5 + Socket.IO (backend)
