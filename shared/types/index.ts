@@ -8,11 +8,11 @@ export interface UserProfile {
   createdAt: number; // 时间戳
 }
 
-// ===== Answer (7-point Likert) =====
+// ===== Answer (二选一) =====
 export interface Answer {
   questionId: number;            // 题目编号
-  dimension: 'EI' | 'SN' | 'TF' | 'JP';
-  value: number;                 // -3 到 +3（Likert 量表）
+  chosen: 'A' | 'B';            // 选择的选项
+  value: string;                 // E/I/S/N/T/F/J/P
   timestamp: number;
 }
 
@@ -131,7 +131,7 @@ export interface Question {
 // ===== Socket Events =====
 export interface ServerToClientEvents {
   'partner-joined': (data: { name: string; userId: string }) => void;
-  'answer-synced': (data: { questionId: number; value: number }) => void;
+  'answer-synced': (data: { questionId: number; value: string }) => void;
   'both-completed': () => void;
   'partner-answers': (data: { answers: Answer[] }) => void;
   'new-message': (data: ChatMessage) => void;
