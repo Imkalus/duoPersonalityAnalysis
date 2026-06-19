@@ -1,21 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getUser, getRoom, saveRoom } from '../utils/storage';
+import { getRoom, saveRoom } from '../utils/storage';
 import { sanitizeHTML } from '../utils/sanitize';
 
 export function Analysis() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  const user = getUser();
   const room = getRoom(roomId || '');
   const [analysis, setAnalysis] = useState(room?.relationshipAnalysis || '');
-  const [loading, setLoading] = useState(!analysis);
-  const [error, setError] = useState('');
 
+  // Fallback: if somehow we got here without analysis, try to fetch
   useEffect(() => {
     if (analysis || !room?.myResult || !room?.partnerResult) return;
 
-    setLoading(true);
     fetch('/api/analysis', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -28,33 +25,20 @@ export function Analysis() {
     })
       .then((r) => r.json())
       .then((data) => {
-        if (data.error) throw new Error(data.error);
-        setAnalysis(data.analysis);
-        saveRoom(roomId!, { relationshipAnalysis: data.analysis, status: 'chatting' });
+        if (data.analysis) {
+          setAnalysis(data.analysis);
+          saveRoom(roomId!, { relationshipAnalysis: data.analysis, status: 'chatting' });
+        }
       })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .catch(() => {});
   }, [analysis, room, roomId]);
 
-  if (loading) {
+  if (!analysis) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
-          <p className="text-lg">AI 正在分析，预计需要 15 秒...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-500 mb-4">{error}</p>
-          <button onClick={() => window.location.reload()} className="px-4 py-2 bg-blue-500 text-white rounded-lg">
-            重试
-          </button>
+          <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-3" />
+          <p className="text-slate-500 dark:text-slate-400">正在计算宁配不配指数...</p>
         </div>
       </div>
     );
@@ -63,8 +47,8 @@ export function Analysis() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
-        <h1 className="text-2xl font-bold text-center mb-6">双人关系分析</h1>
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6 mb-6">
+        <h1 className="text-2xl font-bold text-center mb-6 text-slate-800 dark:text-white">双人关系分析</h1>
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow p-6 mb-6">
           <div
             className="prose dark:prose-invert max-w-none"
             dangerouslySetInnerHTML={{ __html: sanitizeHTML(analysis) }}

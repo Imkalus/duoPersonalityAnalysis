@@ -165,7 +165,22 @@ export function TestMobile() {
       </div>
 
       {/* 底部按钮 */}
-      <div className="px-6 pb-8 pt-4 safe-area-pb">
+      <div className="px-6 pb-8 pt-4 safe-area-pb space-y-3">
+        <button
+          onClick={() => {
+            const filled: Answer[] = questions.slice(0, -1).map((q) => {
+              const choice = Math.random() > 0.5 ? 'A' : 'B';
+              const choiceData = choice === 'A' ? q.choiceA : q.choiceB;
+              return { questionId: q.id, chosen: choice, value: choiceData.value, timestamp: Date.now() };
+            });
+            setAnswers(filled);
+            setCurrentIndex(questions.length - 1);
+            setSelected(null);
+          }}
+          className="w-full py-2.5 bg-amber-400/20 backdrop-blur-sm text-amber-200 text-sm rounded-xl transition-all"
+        >
+          一键填充（跳到最后一题）
+        </button>
         <button
           onClick={() => {
             if (currentIndex > 0) {

@@ -3,6 +3,13 @@ import { nanoid } from 'nanoid';
 import { roomStore } from '../store';
 import { rateLimiter } from '../middleware/rateLimiter';
 import type { CreateRoomRequest, JoinRoomRequest } from '@mbti-duo/shared';
+import type { Server } from 'socket.io';
+
+let ioRef: Server | null = null;
+
+export function setSocketIO(io: Server) {
+  ioRef = io;
+}
 
 export const roomsRouter = Router();
 
@@ -56,7 +63,7 @@ roomsRouter.get('/:roomId', (req, res) => {
     roomId: room.roomId,
     status: room.status,
     members: {
-      A: { name: room.members.A.name },
+      A: { userId: room.members.A.userId, name: room.members.A.name },
       B: room.members.B ? { name: room.members.B.name } : null,
     },
     relationship: room.relationship,
@@ -89,6 +96,14 @@ roomsRouter.post('/:roomId/join', (req, res) => {
   const userId = `user_${nanoid(8)}`;
   room.members.B = { socketId: '', userId, name };
   room.status = 'testing';
+
+  // Notify A that B has joined
+  if (ioRef) {
+    ioRef.to(room.roomId).emit('partner-joined', {
+      name,
+      userId,
+    });
+  }
 
   res.json({
     roomId: room.roomId,

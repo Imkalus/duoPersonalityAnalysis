@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { setUser } from '../utils/storage';
@@ -15,6 +15,12 @@ export function HomeDesktop() {
   const [displayMode, setDisplayMode] = useState<DisplayMode>('hidden');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(() => setError(''), 3000);
+    return () => clearTimeout(t);
+  }, [error]);
 
   const handleCreate = async () => {
     if (!name.trim()) { setError('请输入用户名'); return; }
@@ -60,28 +66,29 @@ export function HomeDesktop() {
   };
 
   return (
+    <>
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex">
       {/* 左侧装饰区域 */}
-      <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 bg-gradient-to-br from-blue-600 to-indigo-700 p-12 flex-col justify-between relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 bg-gradient-to-br from-blue-600 to-indigo-700 dark:from-slate-900 dark:to-indigo-950 p-12 flex-col justify-between relative overflow-hidden">
         {/* 装饰元素 */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-64 h-64 bg-white rounded-full blur-3xl" />
-          <div className="absolute bottom-20 right-20 w-96 h-96 bg-indigo-300 rounded-full blur-3xl" />
+        <div className="absolute inset-0 opacity-10 dark:opacity-5">
+          <div className="absolute top-20 left-20 w-64 h-64 bg-white dark:bg-indigo-400 rounded-full blur-3xl" />
+          <div className="absolute bottom-20 right-20 w-96 h-96 bg-indigo-300 dark:bg-indigo-500 rounded-full blur-3xl" />
         </div>
 
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-12">
             <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-              <span className="text-2xl font-bold text-white">M</span>
+              <span className="text-2xl font-bold text-white">宁</span>
             </div>
-            <span className="text-xl font-semibold text-white">MBTI 双人测试</span>
+            <span className="text-xl font-semibold text-white">宁配吗</span>
           </div>
 
           <h1 className="text-4xl xl:text-5xl font-bold text-white mb-6 leading-tight">
-            和朋友一起<br />探索性格密码
+            两种性格<br />一场化学反应
           </h1>
           <p className="text-lg text-white/80 max-w-md">
-            通过 MBTI 性格测试，了解自己和朋友的性格特点，发现彼此的互补之处。
+            每段关系都是一次独特的碰撞——默契与摩擦、互补与冲突、意料之外的默契与始料未及的误解。测一测，看清你们之间看不见的那条线。
           </p>
         </div>
 
@@ -96,8 +103,8 @@ export function HomeDesktop() {
               <div className="text-sm text-white/60">性格类型</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-white">4</div>
-              <div className="text-sm text-white/60">AI 角色</div>
+              <div className="text-3xl font-bold text-white">8</div>
+              <div className="text-sm text-white/60">维度分析</div>
             </div>
           </div>
         </div>
@@ -110,18 +117,22 @@ export function HomeDesktop() {
           <div className="flex justify-end mb-8">
             <button
               onClick={toggle}
-              className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-lg flex items-center justify-center text-lg hover:scale-110 transition-transform"
+              className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:scale-110 transition-transform"
             >
-              {theme === 'light' ? '🌙' : '☀️'}
+              {theme === 'light' ? (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" /></svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+              )}
             </button>
           </div>
 
           {/* Logo (小屏幕) */}
           <div className="lg:hidden text-center mb-8">
             <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-xl flex items-center justify-center">
-              <span className="text-3xl text-white font-bold">M</span>
+              <span className="text-3xl text-white font-bold">宁</span>
             </div>
-            <h1 className="text-2xl font-bold text-slate-800 dark:text-white">MBTI 双人测试</h1>
+            <h1 className="text-2xl font-bold text-slate-800 dark:text-white">宁配吗</h1>
           </div>
 
           {/* 模式切换 */}
@@ -147,12 +158,6 @@ export function HomeDesktop() {
               加入房间
             </button>
           </div>
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-xl text-sm">
-              {error}
-            </div>
-          )}
 
           {/* 表单 */}
           <div className="space-y-5">
@@ -279,5 +284,11 @@ export function HomeDesktop() {
         </div>
       </div>
     </div>
+    {error && (
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-3 bg-red-500/90 dark:bg-red-600/90 backdrop-blur-sm text-white text-sm rounded-xl shadow-lg shadow-red-500/25 animate-[fadeIn_0.2s_ease]">
+        {error}
+      </div>
+    )}
+    </>
   );
 }

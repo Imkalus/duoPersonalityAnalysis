@@ -19,6 +19,7 @@ export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToCli
       const isB = room.members.B?.userId === userId;
 
       if (!isA && !isB) {
+        console.log(`User ${userId} not in room ${roomId}`);
         return;
       }
 
@@ -30,53 +31,28 @@ export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToCli
         room.members.A.socketId = socket.id;
       } else if (room.members.B) {
         room.members.B.socketId = socket.id;
-        // 通知 A：B 已加入
-        io.to(roomId).emit('partner-joined', {
+      }
+
+      console.log(`User ${userId} (${isA ? 'A' : 'B'}) joined room ${roomId}`);
+
+      // 发送房间当前状态给加入者
+      socket.emit('room-state', {
+        status: room.status,
+        answersA: room.answers.A.length,
+        answersB: room.answers.B.length,
+      });
+
+      // 如果 B 加入了，通知 A
+      if (isB && room.members.B) {
+        socket.to(roomId).emit('partner-joined', {
           name: room.members.B.name,
           userId: room.members.B.userId,
         });
       }
-
-      // 发送房间当前状态
-      socket.emit('room-state', {
-        status: room.status,
-        answersA: room.answers.A.length,
-        answersB: room.answers.B.length,
-      });
     });
 
-    // rejoin-room（重连时使用）
-    socket.on('join-room', ({ roomId, userId }) => {
-      const room = roomStore.get(roomId);
-      if (!room) {
-        socket.emit('room-expired');
-        return;
-      }
-
-      const isA = room.members.A.userId === userId;
-      const isB = room.members.B?.userId === userId;
-
-      if (!isA && !isB) return;
-
-      socket.join(roomId);
-      socket.data = { roomId, userId, role: isA ? 'A' : 'B' };
-
-      if (isA) {
-        room.members.A.socketId = socket.id;
-      } else if (room.members.B) {
-        room.members.B.socketId = socket.id;
-      }
-
-      // 通知对方已重连
-      socket.to(roomId).emit('user-reconnected');
-
-      // 发送当前状态
-      socket.emit('room-state', {
-        status: room.status,
-        answersA: room.answers.A.length,
-        answersB: room.answers.B.length,
-      });
-    });
+    // 通知房间状态变更（当 B 通过 REST 加入时调用）
+    // 这个由 routes/rooms.ts 中的 join 端点触发
 
     // 提交单题答案
     socket.on('answer-submitted', ({ roomId, answer }) => {
@@ -116,10 +92,33 @@ export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToCli
       const role = socket.data.role as 'A' | 'B';
       if (!role) return;
 
+      // 标记该用户已完成
+      if (role === 'A') {
+        room.members.A.completed = true;
+      } else {
+        room.members.B!.completed = true;
+      }
+
       // 检查双方是否都完成
-      const bothCompleted = room.answers.A.length > 0 && room.answers.B.length > 0;
+      const bothCompleted = room.members.A.completed && room.members.B?.completed;
       if (bothCompleted) {
         room.status = 'analyzing';
+
+        // 给 A 发 B 的答案，给 B 发 A 的答案
+        const members = io.sockets.adapter.rooms.get(roomId);
+        if (members) {
+          for (const sid of members) {
+            const s = io.sockets.sockets.get(sid);
+            if (!s) continue;
+            const r = s.data.role as 'A' | 'B';
+            if (r === 'A') {
+              s.emit('partner-answers', { answers: room.answers.B });
+            } else {
+              s.emit('partner-answers', { answers: room.answers.A });
+            }
+          }
+        }
+
         io.to(roomId).emit('both-completed');
       }
     });

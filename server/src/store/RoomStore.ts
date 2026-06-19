@@ -11,8 +11,8 @@ import type {
 export interface ServerRoom {
   roomId: string;
   members: {
-    A: { socketId: string; userId: string; name: string };
-    B: { socketId: string; userId: string; name: string } | null;
+    A: { socketId: string; userId: string; name: string; completed?: boolean };
+    B: { socketId: string; userId: string; name: string; completed?: boolean } | null;
   };
   status: RoomStatus;
   mode: TestMode;

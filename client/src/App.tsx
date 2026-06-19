@@ -11,7 +11,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <BrowserRouter>
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors">
+        <div style={{ position: 'fixed', inset: 0, overflow: 'auto' }} className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/room/:roomId" element={<Room />} />

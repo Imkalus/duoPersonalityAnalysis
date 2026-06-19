@@ -20,29 +20,35 @@ export function TestDesktop() {
   const currentQuestion = questions[currentIndex];
 
   const handleSelect = useCallback((choice: 'A' | 'B') => {
+    if (!currentQuestion || animating) return;
+
     setSelected(choice);
-  }, []);
 
-  const handleNext = useCallback(() => {
-    if (!selected || !currentQuestion) return;
-
-    const choiceData = selected === 'A' ? currentQuestion.choiceA : currentQuestion.choiceB;
+    const choiceData = choice === 'A' ? currentQuestion.choiceA : currentQuestion.choiceB;
     const answer: Answer = {
       questionId: currentQuestion.id,
-      chosen: selected,
+      chosen: choice,
       value: choiceData.value,
       timestamp: Date.now(),
     };
 
-    const newAnswers = [...answers, answer];
+    // Update or add answer (handles going back and re-selecting)
+    const newAnswers = [...answers];
+    const existingIdx = newAnswers.findIndex((a) => a.questionId === currentQuestion.id);
+    if (existingIdx >= 0) {
+      newAnswers[existingIdx] = answer;
+    } else {
+      newAnswers.push(answer);
+    }
     setAnswers(newAnswers);
     emit('answer-submitted', { roomId: roomId!, answer });
 
+    // Auto-advance after short delay
     setAnimating(true);
     setTimeout(() => {
       if (currentIndex < questions.length - 1) {
         setCurrentIndex(currentIndex + 1);
-        setSelected(null);
+        setSelected(newAnswers[currentIndex + 1]?.chosen ?? null);
       } else {
         emit('answers-batch', { roomId: roomId!, answers: newAnswers });
         emit('test-completed', { roomId: roomId!, userId: user!.id });
@@ -50,8 +56,8 @@ export function TestDesktop() {
         navigate(`/room/${roomId}/result`);
       }
       setAnimating(false);
-    }, 300);
-  }, [selected, currentQuestion, answers, currentIndex, emit, roomId, user, navigate]);
+    }, 400);
+  }, [currentQuestion, answers, currentIndex, emit, roomId, user, navigate, animating]);
 
   const handlePrev = useCallback(() => {
     if (currentIndex > 0) {
@@ -60,6 +66,22 @@ export function TestDesktop() {
     }
   }, [currentIndex, answers]);
 
+  const handleFillAll = useCallback(() => {
+    const filled: Answer[] = questions.slice(0, -1).map((q) => {
+      const choice = Math.random() > 0.5 ? 'A' : 'B';
+      const choiceData = choice === 'A' ? q.choiceA : q.choiceB;
+      return {
+        questionId: q.id,
+        chosen: choice,
+        value: choiceData.value,
+        timestamp: Date.now(),
+      };
+    });
+    setAnswers(filled);
+    setCurrentIndex(questions.length - 1);
+    setSelected(null);
+  }, []);
+
   if (!currentQuestion) {
     return <div className="min-h-screen flex items-center justify-center">题目加载失败</div>;
   }
@@ -67,9 +89,9 @@ export function TestDesktop() {
   const progress = ((currentIndex + 1) / questions.length) * 100;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex">
+    <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex">
       {/* 左侧：题目和选项 */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* 顶部进度栏 */}
         <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 px-8 py-4">
           <div className="flex items-center justify-between mb-2">
@@ -162,21 +184,17 @@ export function TestDesktop() {
 
         {/* 底部导航 */}
         <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-t border-slate-200 dark:border-slate-700 px-8 py-4">
-          <div className="flex gap-4 max-w-2xl mx-auto">
+          <div className="flex items-center justify-between max-w-2xl mx-auto">
             <button
               onClick={handlePrev}
               disabled={currentIndex === 0}
-              className="flex-1 py-3 px-6 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-medium disabled:opacity-50 transition-all hover:bg-slate-200 dark:hover:bg-slate-700"
+              className="py-3 px-6 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-medium disabled:opacity-50 transition-all hover:bg-slate-200 dark:hover:bg-slate-700"
             >
               上一题
             </button>
-            <button
-              onClick={handleNext}
-              disabled={!selected}
-              className="flex-[2] py-3 px-6 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-medium disabled:opacity-50 transition-all hover:shadow-lg hover:shadow-blue-500/25 active:scale-[0.98]"
-            >
-              {currentIndex === questions.length - 1 ? '完成测试' : '下一题'}
-            </button>
+            <span className="text-sm text-slate-400 dark:text-slate-500">
+              选择后自动跳转
+            </span>
           </div>
         </div>
       </div>
@@ -209,10 +227,16 @@ export function TestDesktop() {
           </div>
         </div>
 
-        <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+        <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
           <div className="text-center text-sm text-slate-500 dark:text-slate-400">
             选择 A 或 B 继续答题
           </div>
+          <button
+            onClick={handleFillAll}
+            className="w-full py-2 px-3 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+          >
+            一键填充（跳到最后一题）
+          </button>
         </div>
       </div>
     </div>
