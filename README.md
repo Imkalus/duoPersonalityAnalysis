@@ -26,10 +26,26 @@ bun install
 
 # 启动开发服务器
 bun dev
+
+# 构建生产版本
+bun run build
+
+# 运行测试
+bun test
 ```
 
 - 前端: http://localhost:5173
 - 后端: http://localhost:3000
+
+## 环境变量
+
+在 `server/` 目录下创建 `.env` 文件：
+
+```bash
+LLM_BASE_URL=https://api.openai.com/v1  # OpenAI 兼容 API 地址
+LLM_API_KEY=your-api-key
+LLM_MODEL=gpt-4o-mini                     # 模型名称
+```
 
 ## 项目结构
 
