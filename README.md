@@ -22,10 +22,10 @@
 
 ```bash
 # 安装依赖
-pnpm install
+bun install
 
 # 启动开发服务器
-pnpm dev
+bun dev
 ```
 
 - 前端: http://localhost:5173
