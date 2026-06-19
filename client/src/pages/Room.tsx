@@ -17,6 +17,7 @@ export function Room() {
   const [joinName, setJoinName] = useState('');
   const [joining, setJoining] = useState(false);
   const [joined, setJoined] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Determine role: if user's id matches room's A.userId, they're the creator
   const isCreator = currentUser && roomData && currentUser.id === roomData.members?.A?.userId;
@@ -36,8 +37,17 @@ export function Room() {
         setRoomData(data);
         setLoading(false);
 
-        // If room is already past 'waiting' and user is A, go straight to test
-        if (data.status !== 'waiting' && currentUser && currentUser.id === data.members?.A?.userId) {
+        // 持久化房间元信息，供答题/分析/对话页读取
+        saveRoom(roomId, {
+          relationship: data.relationship,
+          displayMode: data.displayMode,
+          questionVersion: data.questionVersion,
+          partnerId: data.members?.A?.userId,
+          partnerName: data.members?.A?.name,
+        });
+
+        // If room is already past 'waiting' and user has a profile, go straight to test
+        if (data.status !== 'waiting' && currentUser) {
           navigate(`/room/${roomId}/test`);
         }
       })
@@ -142,14 +152,33 @@ export function Room() {
               {inviteUrl}
             </div>
             <button
-              onClick={() => navigator.clipboard.writeText(inviteUrl)}
-              className="mt-3 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm"
+              onClick={() => {
+                navigator.clipboard.writeText(inviteUrl).then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }).catch(() => {
+                  // Fallback for HTTP or permission issues
+                  const input = document.createElement('input');
+                  input.value = inviteUrl;
+                  document.body.appendChild(input);
+                  input.select();
+                  document.execCommand('copy');
+                  document.body.removeChild(input);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                });
+              }}
+              className={`mt-3 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                copied
+                  ? 'bg-emerald-500 text-white'
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
+              }`}
             >
-              复制链接
+              {copied ? '✓ 已复制' : '复制链接'}
             </button>
           </div>
           <div className="text-sm text-gray-500">
-            关系：{sanitizeText(roomData.relationship)} | 模式：{roomData.mode === 'sync' ? '同步' : '独立'}
+            关系：{sanitizeText(roomData.relationship)} | {roomData.displayMode === 'open' ? '明牌' : '暗牌'}
           </div>
         </div>
       </div>
@@ -172,7 +201,7 @@ export function Room() {
                 {fromName ? `${fromName} 邀请你加入测试` : '你被邀请加入 MBTI 双人测试'}
               </p>
               <p className="text-sm text-gray-500 mb-6">
-                关系：{sanitizeText(roomData.relationship)} | 模式：{roomData.mode === 'sync' ? '同步' : '独立'}
+                关系：{sanitizeText(roomData.relationship)} | {roomData.displayMode === 'open' ? '明牌' : '暗牌'}
               </p>
               <input
                 type="text"

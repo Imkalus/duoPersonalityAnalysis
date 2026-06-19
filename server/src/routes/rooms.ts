@@ -15,7 +15,7 @@ export const roomsRouter = Router();
 
 // 创建房间
 roomsRouter.post('/', rateLimiter, (req, res) => {
-  const { name, relationship, mode, questionVersion, displayMode } = req.body as CreateRoomRequest;
+  const { name, relationship, questionVersion, displayMode } = req.body as CreateRoomRequest;
 
   if (!name || name.length < 2 || name.length > 20) {
     res.status(400).json({ error: '用户名需要 2-20 个字符' });
@@ -37,14 +37,15 @@ roomsRouter.post('/', rateLimiter, (req, res) => {
       B: null,
     },
     status: 'waiting',
-    mode,
-    displayMode: displayMode || 'hidden',
+    displayMode: displayMode === 'open' ? 'open' : 'hidden',
     questionVersion,
     relationship,
     createdAt: Date.now(),
     answers: { A: [], B: [] },
     results: { A: null, B: null },
+    types: { A: null, B: null },
     analysis: null,
+    chat: { messages: [], character: 'kind', typing: false },
   });
 
   res.json({ roomId, userId });
@@ -67,7 +68,6 @@ roomsRouter.get('/:roomId', (req, res) => {
       B: room.members.B ? { name: room.members.B.name } : null,
     },
     relationship: room.relationship,
-    mode: room.mode,
     displayMode: room.displayMode,
     questionVersion: room.questionVersion,
   });
@@ -110,7 +110,6 @@ roomsRouter.post('/:roomId/join', (req, res) => {
     userId,
     partnerName: room.members.A.name,
     relationship: room.relationship,
-    mode: room.mode,
     questionVersion: room.questionVersion,
     displayMode: room.displayMode,
   });

@@ -1,11 +1,12 @@
 import type {
   Answer,
   RoomStatus,
-  TestMode,
   DisplayMode,
   QuestionVersion,
   Relationship,
   MBTIResult,
+  ChatMessage,
+  Character,
 } from '@mbti-duo/shared';
 
 export interface ServerRoom {
@@ -15,7 +16,6 @@ export interface ServerRoom {
     B: { socketId: string; userId: string; name: string; completed?: boolean } | null;
   };
   status: RoomStatus;
-  mode: TestMode;
   displayMode: DisplayMode;
   questionVersion: QuestionVersion;
   relationship: Relationship;
@@ -31,7 +31,23 @@ export interface ServerRoom {
     B: MBTIResult | null;
   };
 
+  // 双方 MBTI 类型字符串（由分析接口填充，供后续对话提供上下文）
+  types: {
+    A: string | null;
+    B: string | null;
+  };
+
   analysis: string | null;
+
+  // 进行中的分析请求（in-flight 去重：A/B 同时触发时只发一次 LLM 调用）
+  analysisInFlight?: Promise<string> | null;
+
+  // 共享对话状态
+  chat: {
+    messages: ChatMessage[];
+    character: Character;
+    typing: boolean;
+  };
 }
 
 export interface RoomStore {

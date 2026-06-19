@@ -1,76 +1,105 @@
-import OpenAI from 'openai';
 import type { Character } from '@mbti-duo/shared';
+import {
+  ANALYSIS_SYSTEM_PROMPT,
+  buildAnalysisUserPrompt,
+  buildChatSystemPrompt,
+  type PersonProfile,
+} from './prompts';
 
-const openai = new OpenAI({
-  baseURL: process.env.LLM_BASE_URL || 'https://api.openai.com/v1',
-  apiKey: process.env.LLM_API_KEY || '',
-});
+// 惰性读取环境变量：避免 ES module import 提升导致在 dotenv config() 之前固化默认值
+function llmConfig() {
+  return {
+    baseUrl: process.env.LLM_BASE_URL || 'https://api.openai.com/v1',
+    apiKey: process.env.LLM_API_KEY || '',
+    model: process.env.LLM_MODEL || 'gpt-4o-mini',
+  };
+}
 
-const MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';
+// 粗略估算 token 数：中文按 ~1.5 字/token，英文/符号按 ~4 字符/token。
+// 仅用于日志和上下文超限预警，不要求精确。
+function estimateTokens(text: string): number {
+  let cjk = 0;
+  let other = 0;
+  for (const ch of text) {
+    if (/[一-鿿　-〿＀-￯]/.test(ch)) cjk++;
+    else other++;
+  }
+  return Math.ceil(cjk / 1.5 + other / 4);
+}
 
-const CHARACTER_PROMPTS: Record<Character, string> = {
-  mediator: '你是"百姓调解员"，风格温柔温和，善于引导双方理解彼此。用温暖、包容的语气沟通，避免直接批评。',
-  genie: '你是"阿拉灯神丁"，风格幽默犀利，敢于说真话。用轻松、调侃的方式点出问题，但不恶意攻击。',
-  evil: '你是"邪恶人格"，风格直白尖锐，直击痛点。不回避敏感话题，用最直接的方式分析问题，可能扎心但有深度。',
-  kind: '你是"善良人格"，风格温暖治愈，充满正能量。鼓励双方看到彼此的优点，用乐观积极的方式看待问题。',
-};
+// 模型上下文上限。MiMo-V2.5 / V2.5-Pro 原生支持 256K（262144）tokens 上下文，
+// 本项目单次提示词仅 ~1K tokens，余量极大。这里取 256K 作为预警阈值，可按所用模型调整。
+const CONTEXT_LIMIT = 262_144;
 
-export async function generateAnalysis(
-  typeA: string,
-  typeB: string,
-  relationship: string
+async function callLLM(
+  messages: { role: string; content: string }[],
+  maxTokens: number,
+  tag: string
 ): Promise<string> {
-  const response = await openai.chat.completions.create({
-    model: MODEL,
-    messages: [
-      {
-        role: 'system',
-        content: '你是一个 MBTI 性格分析专家。请根据双方的 MBTI 类型和关系类型，生成详细的双人关系分析。分析应包含：关系特点、互补点、潜在冲突、相处建议。使用 Markdown 格式，内容要有深度和实用性。',
-      },
-      {
-        role: 'user',
-        content: `请分析以下双人关系：
-- 用户 A 的 MBTI 类型：${typeA}
-- 用户 B 的 MBTI 类型：${typeB}
-- 关系类型：${relationship}
+  const { baseUrl, apiKey, model } = llmConfig();
+  const url = `${baseUrl}/chat/completions`;
 
-请生成详细的分析报告。`,
-      },
-    ],
-    max_tokens: 1500,
+  const promptTokens = messages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
+  console.log(`[LLM] ${tag} → ${url}, model=${model}`);
+  console.log(`[LLM] ${tag} 估算输入 ~${promptTokens} tokens + 预留输出 ${maxTokens} tokens = ~${promptTokens + maxTokens}（上下文上限约 ${CONTEXT_LIMIT}）`);
+  if (promptTokens + maxTokens > CONTEXT_LIMIT) {
+    console.warn(`[LLM] ⚠️ ${tag} 预计可能超出上下文上限，请精简提示词或缩短输出预留`);
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      max_tokens: maxTokens,
+    }),
+    signal: AbortSignal.timeout(120_000),
   });
 
-  return response.choices[0]?.message?.content || '分析生成失败，请重试';
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`LLM API error ${res.status}: ${body}`);
+  }
+
+  const data = await res.json() as any;
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error(`LLM returned empty content: ${JSON.stringify(data)}`);
+  }
+
+  console.log(`[LLM] ${tag} 成功（输出 ${content.length} 字）`);
+  return content;
+}
+
+export async function generateAnalysis(params: {
+  relationship: string;
+  personA: PersonProfile;
+  personB: PersonProfile;
+}): Promise<string> {
+  console.log(`[LLM] 生成关系分析：${params.personA.type} + ${params.personB.type}，关系=${params.relationship}`);
+
+  return callLLM([
+    { role: 'system', content: ANALYSIS_SYSTEM_PROMPT },
+    { role: 'user', content: buildAnalysisUserPrompt(params) },
+  ], 8000, '分析');
 }
 
 export async function chatCompletion(params: {
-  typeA: string;
-  typeB: string;
   relationship: string;
+  personA: PersonProfile;
+  personB: PersonProfile;
   character: Character;
   message: string;
 }): Promise<string> {
-  const { typeA, typeB, relationship, character, message } = params;
-  const systemPrompt = CHARACTER_PROMPTS[character];
+  const { relationship, personA, personB, character, message } = params;
 
-  const response = await openai.chat.completions.create({
-    model: MODEL,
-    messages: [
-      {
-        role: 'system',
-        content: `${systemPrompt}
-
-背景信息：
-- 用户 A 的 MBTI 类型：${typeA}
-- 用户 B 的 MBTI 类型：${typeB}
-- 他们的关系类型：${relationship}
-
-请以你的角色风格回应用户的对话。保持角色一致性，回复简洁有力。`,
-      },
-      { role: 'user', content: message },
-    ],
-    max_tokens: 500,
-  });
-
-  return response.choices[0]?.message?.content || '回复生成失败';
+  return callLLM([
+    { role: 'system', content: buildChatSystemPrompt({ relationship, personA, personB, character }) },
+    { role: 'user', content: message },
+  ], 4000, '对话');
 }
+

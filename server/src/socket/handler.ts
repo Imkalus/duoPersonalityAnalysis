@@ -1,6 +1,28 @@
 import type { Server } from 'socket.io';
-import type { ServerToClientEvents, ClientToServerEvents } from '@mbti-duo/shared';
+import type { ServerToClientEvents, ClientToServerEvents, Character, MBTIResult } from '@mbti-duo/shared';
 import { roomStore } from '../store';
+import { chatCompletion } from '../services/llm';
+import type { PersonProfile } from '../services/prompts';
+
+function makeId(): string {
+  return `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+// 由类型 + 完整结果构造对话所需画像；缺维度数据时用 50% 兜底
+function buildProfile(name: string, type: string, result?: MBTIResult | null): PersonProfile {
+  const d = result?.dimensions;
+  const fb = (dir: string) => ({ direction: dir, percentage: 50 });
+  return {
+    name,
+    type,
+    dimensions: {
+      EI: d?.EI ? { direction: d.EI.direction, percentage: d.EI.percentage } : fb(type[0] || 'E'),
+      SN: d?.SN ? { direction: d.SN.direction, percentage: d.SN.percentage } : fb(type[1] || 'N'),
+      TF: d?.TF ? { direction: d.TF.direction, percentage: d.TF.percentage } : fb(type[2] || 'T'),
+      JP: d?.JP ? { direction: d.JP.direction, percentage: d.JP.percentage } : fb(type[3] || 'J'),
+    },
+  };
+}
 
 export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToClientEvents>): void {
   io.on('connection', (socket) => {
@@ -42,6 +64,22 @@ export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToCli
         answersB: room.answers.B.length,
       });
 
+      // 同步共享对话状态（历史消息 + 当前人格 + 是否正在回复）
+      socket.emit('chat-history', {
+        messages: room.chat.messages,
+        character: room.chat.character,
+        typing: room.chat.typing,
+      });
+
+      // 如果双方都完成了答题，重新发送对方答案（防止因导航断连丢失事件）
+      if (room.members.A.completed && room.members.B?.completed) {
+        if (isA) {
+          socket.emit('partner-answers', { answers: room.answers.B });
+        } else {
+          socket.emit('partner-answers', { answers: room.answers.A });
+        }
+      }
+
       // 如果 B 加入了，通知 A
       if (isB && room.members.B) {
         socket.to(roomId).emit('partner-joined', {
@@ -50,9 +88,6 @@ export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToCli
         });
       }
     });
-
-    // 通知房间状态变更（当 B 通过 REST 加入时调用）
-    // 这个由 routes/rooms.ts 中的 join 端点触发
 
     // 提交单题答案
     socket.on('answer-submitted', ({ roomId, answer }) => {
@@ -64,16 +99,20 @@ export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToCli
 
       room.answers[role].push(answer);
 
-      // 同步模式下广播给对方
-      if (room.mode === 'sync') {
+      // 明牌：广播题号+选择；暗牌：只广播进度数
+      if (room.displayMode === 'open') {
         socket.to(roomId).emit('answer-synced', {
           questionId: answer.questionId,
           value: answer.value,
         });
+      } else {
+        socket.to(roomId).emit('partner-progress', {
+          count: room.answers[role].length,
+        });
       }
     });
 
-    // 批量提交答案（独立模式完成时）
+    // 批量提交答案（完成时）
     socket.on('answers-batch', ({ roomId, answers }) => {
       const room = roomStore.get(roomId);
       if (!room) return;
@@ -85,7 +124,7 @@ export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToCli
     });
 
     // 完成测试
-    socket.on('test-completed', ({ roomId, userId }) => {
+    socket.on('test-completed', ({ roomId }) => {
       const room = roomStore.get(roomId);
       if (!room) return;
 
@@ -123,23 +162,86 @@ export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToCli
       }
     });
 
-    // 聊天消息
-    socket.on('chat-message', ({ roomId, message, character }) => {
+    // 切换对话人格（双方共享）
+    socket.on('change-character', ({ roomId, character }) => {
+      const room = roomStore.get(roomId);
+      if (!room) return;
+      const role = socket.data.role as 'A' | 'B';
+      if (!role) return;
+      if (character !== 'kind' && character !== 'evil') return;
+
+      room.chat.character = character;
+      io.to(roomId).emit('character-changed', { character });
+    });
+
+    // 聊天消息（共享对话框：服务端为唯一数据源）
+    socket.on('chat-message', async ({ roomId, message, character }) => {
       const room = roomStore.get(roomId);
       if (!room) return;
 
       const role = socket.data.role as 'A' | 'B';
       if (!role) return;
 
-      const chatMessage = {
-        id: `${Date.now()}_${Math.random().toString(36).slice(2)}`,
-        role: role === 'A' ? 'user_a' as const : 'user_b' as const,
-        content: message,
-        character,
+      const text = (message || '').trim();
+      if (!text || text.length > 500) return;
+      if (room.chat.typing) return; // 上一条还在生成，忽略
+
+      const activeCharacter: Character = character === 'evil' || character === 'kind'
+        ? character
+        : room.chat.character;
+      room.chat.character = activeCharacter;
+
+      const senderName = role === 'A' ? room.members.A.name : room.members.B?.name;
+      const userMessage = {
+        id: makeId(),
+        role: role === 'A' ? ('user_a' as const) : ('user_b' as const),
+        content: text,
+        character: activeCharacter,
+        senderName,
         timestamp: Date.now(),
       };
 
-      io.to(roomId).emit('new-message', chatMessage);
+      room.chat.messages.push(userMessage);
+      io.to(roomId).emit('new-message', userMessage);
+
+      // 标记正在回复，双方同步显示
+      room.chat.typing = true;
+      io.to(roomId).emit('chat-typing', { typing: true });
+
+      try {
+        const typeA = room.types.A || room.results.A?.type || 'unknown';
+        const typeB = room.types.B || room.results.B?.type || 'unknown';
+        const reply = await chatCompletion({
+          relationship: room.relationship,
+          personA: buildProfile(room.members.A.name, typeA, room.results.A),
+          personB: buildProfile(room.members.B?.name || '伙伴', typeB, room.results.B),
+          character: activeCharacter,
+          message: text,
+        });
+        const aiMessage = {
+          id: makeId(),
+          role: 'assistant' as const,
+          content: reply,
+          character: activeCharacter,
+          timestamp: Date.now(),
+        };
+        room.chat.messages.push(aiMessage);
+        io.to(roomId).emit('new-message', aiMessage);
+      } catch (error) {
+        console.error('[Chat] LLM failed:', error);
+        const errMessage = {
+          id: makeId(),
+          role: 'assistant' as const,
+          content: '> ⚠️ AI 暂时无法回复，请稍后再试',
+          character: activeCharacter,
+          timestamp: Date.now(),
+        };
+        room.chat.messages.push(errMessage);
+        io.to(roomId).emit('new-message', errMessage);
+      } finally {
+        room.chat.typing = false;
+        io.to(roomId).emit('chat-typing', { typing: false });
+      }
     });
 
     // 断开连接

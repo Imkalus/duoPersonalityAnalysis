@@ -1,17 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../context/ThemeContext';
 import { setUser } from '../utils/storage';
-import type { Relationship, TestMode, DisplayMode } from '@mbti-duo/shared';
+import type { Relationship, DisplayMode } from '@mbti-duo/shared';
 
 export function HomeDesktop() {
   const navigate = useNavigate();
-  const { theme, toggle } = useTheme();
   const [mode, setMode] = useState<'create' | 'join'>('create');
   const [name, setName] = useState('');
   const [joinRoomId, setJoinRoomId] = useState('');
   const [relationship, setRelationship] = useState<Relationship>('朋友');
-  const [testMode, setTestMode] = useState<TestMode>('independent');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('hidden');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -30,7 +27,7 @@ export function HomeDesktop() {
       const res = await fetch('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), relationship, mode: testMode, questionVersion: 'lite', displayMode }),
+        body: JSON.stringify({ name: name.trim(), relationship, questionVersion: 'lite', displayMode }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -85,10 +82,10 @@ export function HomeDesktop() {
           </div>
 
           <h1 className="text-4xl xl:text-5xl font-bold text-white mb-6 leading-tight">
-            两种性格<br />一场化学反应
+            两个灵魂<br />一道送命题：<br />宁俩，配吗？
           </h1>
           <p className="text-lg text-white/80 max-w-md">
-            每段关系都是一次独特的碰撞——默契与摩擦、互补与冲突、意料之外的默契与始料未及的误解。测一测，看清你们之间看不见的那条线。
+            性格是一场无声的角力——谁在迁就，谁在较劲，谁的雷区正踩在对方的脚下。别猜了，让算法替你们把那句没说出口的话摊开。
           </p>
         </div>
 
@@ -113,20 +110,6 @@ export function HomeDesktop() {
       {/* 右侧表单区域 */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
-          {/* 主题切换 */}
-          <div className="flex justify-end mb-8">
-            <button
-              onClick={toggle}
-              className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:scale-110 transition-transform"
-            >
-              {theme === 'light' ? (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" /></svg>
-              ) : (
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-              )}
-            </button>
-          </div>
-
           {/* Logo (小屏幕) */}
           <div className="lg:hidden text-center mb-8">
             <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-xl flex items-center justify-center">
@@ -214,62 +197,32 @@ export function HomeDesktop() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">答题模式</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">答题显示</label>
                   <div className="grid grid-cols-2 gap-3">
                     <button
-                      onClick={() => setTestMode('sync')}
+                      onClick={() => setDisplayMode('open')}
                       className={`p-4 rounded-xl text-left transition-all ${
-                        testMode === 'sync'
-                          ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-500'
+                        displayMode === 'open'
+                          ? 'bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-500'
                           : 'bg-slate-100 dark:bg-slate-800 border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-600'
                       }`}
                     >
-                      <div className="font-medium text-slate-800 dark:text-white">同步答题</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">一起做同一道题</div>
+                      <div className="font-medium text-slate-800 dark:text-white">明牌</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">可看到对方上一题选择</div>
                     </button>
                     <button
-                      onClick={() => setTestMode('independent')}
+                      onClick={() => setDisplayMode('hidden')}
                       className={`p-4 rounded-xl text-left transition-all ${
-                        testMode === 'independent'
-                          ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-500'
+                        displayMode === 'hidden'
+                          ? 'bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-500'
                           : 'bg-slate-100 dark:bg-slate-800 border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-600'
                       }`}
                     >
-                      <div className="font-medium text-slate-800 dark:text-white">各自答题</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">各做各的，做完汇总</div>
+                      <div className="font-medium text-slate-800 dark:text-white">暗牌</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">只显示对方答题进度</div>
                     </button>
                   </div>
                 </div>
-
-                {testMode === 'sync' && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">显示模式</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        onClick={() => setDisplayMode('open')}
-                        className={`p-4 rounded-xl text-left transition-all ${
-                          displayMode === 'open'
-                            ? 'bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-500'
-                            : 'bg-slate-100 dark:bg-slate-800 border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-600'
-                        }`}
-                      >
-                        <div className="font-medium text-slate-800 dark:text-white">明牌</div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">可看到对方选择</div>
-                      </button>
-                      <button
-                        onClick={() => setDisplayMode('hidden')}
-                        className={`p-4 rounded-xl text-left transition-all ${
-                          displayMode === 'hidden'
-                            ? 'bg-indigo-50 dark:bg-indigo-900/20 border-2 border-indigo-500'
-                            : 'bg-slate-100 dark:bg-slate-800 border-2 border-transparent hover:border-slate-300 dark:hover:border-slate-600'
-                        }`}
-                      >
-                        <div className="font-medium text-slate-800 dark:text-white">暗牌</div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">看不到对方选择</div>
-                      </button>
-                    </div>
-                  </div>
-                )}
               </>
             )}
 

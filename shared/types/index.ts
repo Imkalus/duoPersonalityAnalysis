@@ -35,7 +35,6 @@ export interface MBTIResult {
 }
 
 // ===== Room =====
-export type TestMode = 'sync' | 'independent';
 export type QuestionVersion = 'lite' | 'full';  // 28题 / 60题
 export type DisplayMode = 'open' | 'hidden';    // 明牌 / 暗牌
 export type Relationship = '情侣' | '朋友' | '家人' | '同事';
@@ -45,7 +44,6 @@ export interface RoomData {
   partnerName: string;
   partnerId: string;
   relationship: Relationship;
-  mode: TestMode;
   displayMode: DisplayMode;
   questionVersion: QuestionVersion;
   status: RoomStatus;
@@ -59,13 +57,14 @@ export interface RoomData {
 }
 
 // ===== Chat =====
-export type Character = 'mediator' | 'genie' | 'evil' | 'kind';
+export type Character = 'kind' | 'evil';
 
 export interface ChatMessage {
   id: string;
   role: 'user_a' | 'user_b' | 'assistant';
   content: string;
   character: Character;
+  senderName?: string;     // 发送者昵称（用户消息）
   timestamp: number;
 }
 
@@ -73,9 +72,8 @@ export interface ChatMessage {
 export interface CreateRoomRequest {
   name: string;
   relationship: Relationship;
-  mode: TestMode;
   questionVersion: QuestionVersion;
-  displayMode?: DisplayMode;  // sync 模式下必填
+  displayMode: DisplayMode;
 }
 
 export interface CreateRoomResponse {
@@ -92,7 +90,6 @@ export interface JoinRoomResponse {
   userId: string;
   partnerName: string;
   relationship: Relationship;
-  mode: TestMode;
   questionVersion: QuestionVersion;
   displayMode: DisplayMode;
 }
@@ -102,6 +99,11 @@ export interface AnalysisRequest {
   typeA: string;
   typeB: string;
   relationship: Relationship;
+  // 完整画像（含维度明细 + 昵称），用于生成定制化分析
+  nameA?: string;
+  nameB?: string;
+  resultA?: MBTIResult;
+  resultB?: MBTIResult;
 }
 
 export interface AnalysisResponse {
@@ -132,9 +134,13 @@ export interface Question {
 export interface ServerToClientEvents {
   'partner-joined': (data: { name: string; userId: string }) => void;
   'answer-synced': (data: { questionId: number; value: string }) => void;
+  'partner-progress': (data: { count: number }) => void;
   'both-completed': () => void;
   'partner-answers': (data: { answers: Answer[] }) => void;
   'new-message': (data: ChatMessage) => void;
+  'chat-history': (data: { messages: ChatMessage[]; character: Character; typing: boolean }) => void;
+  'chat-typing': (data: { typing: boolean }) => void;
+  'character-changed': (data: { character: Character }) => void;
   'user-disconnected': () => void;
   'user-reconnected': () => void;
   'room-expired': () => void;
@@ -147,4 +153,5 @@ export interface ClientToServerEvents {
   'answers-batch': (data: { roomId: string; answers: Answer[] }) => void;
   'test-completed': (data: { roomId: string; userId: string }) => void;
   'chat-message': (data: { roomId: string; message: string; character: Character }) => void;
+  'change-character': (data: { roomId: string; character: Character }) => void;
 }

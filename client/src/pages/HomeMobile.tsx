@@ -1,17 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../context/ThemeContext';
 import { setUser } from '../utils/storage';
-import type { Relationship, TestMode, DisplayMode } from '@mbti-duo/shared';
+import type { Relationship, DisplayMode } from '@mbti-duo/shared';
 
 export function HomeMobile() {
   const navigate = useNavigate();
-  const { theme, toggle } = useTheme();
   const [mode, setMode] = useState<'create' | 'join'>('create');
   const [name, setName] = useState('');
   const [joinRoomId, setJoinRoomId] = useState('');
   const [relationship, setRelationship] = useState<Relationship>('朋友');
-  const [testMode, setTestMode] = useState<TestMode>('independent');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('hidden');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -31,7 +28,7 @@ export function HomeMobile() {
       const res = await fetch('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), relationship, mode: testMode, questionVersion: 'lite', displayMode }),
+        body: JSON.stringify({ name: name.trim(), relationship, questionVersion: 'lite', displayMode }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -136,61 +133,38 @@ export function HomeMobile() {
                 </div>
               </div>
 
-              {/* 答题模式 */}
+              {/* 显示模式 */}
               <div>
-                <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">答题模式</label>
+                <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">答题显示</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
-                    onClick={() => setTestMode('sync')}
+                    onClick={() => setDisplayMode('open')}
                     className={`py-3 rounded-xl text-sm font-medium transition-all ${
-                      testMode === 'sync'
-                        ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25'
+                      displayMode === 'open'
+                        ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
                         : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
                     }`}
                   >
-                    同步答题
+                    明牌
+                    <span className={`block text-[11px] font-normal mt-0.5 ${displayMode === 'open' ? 'text-white/70' : 'text-slate-400'}`}>
+                      看得到对方选择
+                    </span>
                   </button>
                   <button
-                    onClick={() => setTestMode('independent')}
+                    onClick={() => setDisplayMode('hidden')}
                     className={`py-3 rounded-xl text-sm font-medium transition-all ${
-                      testMode === 'independent'
-                        ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25'
+                      displayMode === 'hidden'
+                        ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
                         : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
                     }`}
                   >
-                    各自答题
+                    暗牌
+                    <span className={`block text-[11px] font-normal mt-0.5 ${displayMode === 'hidden' ? 'text-white/70' : 'text-slate-400'}`}>
+                      只显示进度
+                    </span>
                   </button>
                 </div>
               </div>
-
-              {/* 显示模式 */}
-              {testMode === 'sync' && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">显示模式</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => setDisplayMode('open')}
-                      className={`py-3 rounded-xl text-sm font-medium transition-all ${
-                        displayMode === 'open'
-                          ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
-                          : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                      }`}
-                    >
-                      明牌
-                    </button>
-                    <button
-                      onClick={() => setDisplayMode('hidden')}
-                      className={`py-3 rounded-xl text-sm font-medium transition-all ${
-                        displayMode === 'hidden'
-                          ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
-                          : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                      }`}
-                    >
-                      暗牌
-                    </button>
-                  </div>
-                </div>
-              )}
             </>
           )}
 
@@ -234,13 +208,6 @@ export function HomeMobile() {
             </div>
             <span className="text-sm font-medium text-white/80">宁配吗</span>
           </div>
-          <button onClick={toggle} className="w-8 h-8 flex items-center justify-center text-white/80 hover:text-white transition-colors">
-            {theme === 'light' ? (
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" /></svg>
-            ) : (
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-            )}
-          </button>
         </div>
 
         {/* 核心视觉区域 */}
@@ -259,9 +226,9 @@ export function HomeMobile() {
           </div>
 
           <h1 className="text-2xl font-bold text-white mb-2">宁配吗</h1>
-          <p className="text-white/70 dark:text-white/50 text-sm mb-3">两种性格，一场化学反应</p>
+          <p className="text-white/70 dark:text-white/50 text-sm mb-3">两个灵魂，一道送命题</p>
           <p className="text-white/50 dark:text-white/30 text-xs text-center max-w-[260px] leading-relaxed">
-            看清你们之间的默契与摩擦，发现意想不到的搭配
+            谁在迁就，谁在较劲——让算法替你们摊开那句没说出口的话
           </p>
         </div>
       </div>

@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -44,21 +44,15 @@ No global state library. Uses React useState + Context (theme only). All persist
 
 ### Socket.IO Communication
 
-Fully typed events defined in `shared/types/index.ts`. Client uses `useSocket` hook which returns typed `emit`/`on` functions. Key flow: `join-room` → `partner-joined` → `answer-submitted`/`answer-synced`/`partner-progress` → `test-completed` → `both-completed`. Reconnection handled via duplicate `join-room` handler.
-
-The AI chat is a **server-driven shared session**: the server owns chat history, the selected persona, and the typing state per room (`ServerRoom.chat`). Clients send `chat-message`/`change-character`; the server runs the LLM call and broadcasts `new-message`/`chat-typing`/`character-changed` to both users. On join, the server replays `chat-history` so a reconnecting/late user sees the full conversation. There is no REST chat endpoint.
-
-### Test display modes
-
-There is no longer an "answer mode" — all tests are synchronous. The only option is `displayMode`: `open` (明牌, partner's per-question choice is broadcast via `answer-synced`) or `hidden` (暗牌, only a progress count is broadcast via `partner-progress`).
+Fully typed events defined in `shared/types/index.ts`. Client uses `useSocket` hook which returns typed `emit`/`on` functions. Key flow: `join-room` → `partner-joined` → `answer-submitted`/`answer-synced` → `test-completed` → `both-completed`. Reconnection handled via duplicate `join-room` handler that emits `user-reconnected`.
 
 ### REST API
 
-Mounted at `/api/` with two route groups: `rooms` (CRUD + join) and `analysis` (AI relationship analysis, cached 7 days). Chat is handled over Socket.IO, not REST. Rate-limited: 10 room creations per IP per day.
+Mounted at `/api/` with three route groups: `rooms` (CRUD + join), `analysis` (AI relationship analysis, cached 7 days), `chat` (AI character chat). Rate-limited: 10 room creations per IP per day.
 
 ### LLM Integration
 
-`server/src/services/llm.ts` calls an OpenAI-compatible endpoint via `fetch` with env vars `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`. Note the configured model (`mimo-v2.5`) is a reasoning model that consumes `max_tokens` on hidden reasoning, so token budgets are generous (analysis 8000, chat 4000) to avoid empty completions. Two character personas: `kind` (善良人格) and `evil` (邪恶人格). Fallback template when LLM unavailable.
+`server/src/services/llm.ts` uses OpenAI SDK with env vars `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` (defaults to `gpt-4o-mini`). Four character personas with distinct system prompts. Fallback template when LLM unavailable.
 
 ### Scoring
 
