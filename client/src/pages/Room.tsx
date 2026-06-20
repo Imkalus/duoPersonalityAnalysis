@@ -1,9 +1,38 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { QRCodeSVG } from 'qrcode.react';
 import { getUser, setUser, saveRoom } from '../utils/storage';
 import { useSocket } from '../hooks/useSocket';
 import { sanitizeText } from '../utils/sanitize';
 import type { UserProfile } from '@mbti-duo/shared';
+
+// 复制文本到剪贴板：优先用 Clipboard API（仅 HTTPS/localhost 可用），
+// 否则回退到 execCommand。注意 navigator.clipboard 在非安全上下文下为 undefined，
+// 直接访问 .writeText 会同步抛错，因此必须先判断存在性。
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // 落到下面的兜底方案
+  }
+  try {
+    const input = document.createElement('textarea');
+    input.value = text;
+    input.style.position = 'fixed';
+    input.style.opacity = '0';
+    document.body.appendChild(input);
+    input.focus();
+    input.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(input);
+    return ok;
+  } catch {
+    return false;
+  }
+}
 
 export function Room() {
   const { roomId } = useParams<{ roomId: string }>();
@@ -148,25 +177,27 @@ export function Room() {
           <h1 className="text-2xl font-bold mb-6">房间 {roomId}</h1>
           <div className="mb-6 p-6 bg-white dark:bg-gray-800 rounded-xl shadow">
             <p className="text-gray-600 dark:text-gray-400 mb-4">等待对方加入...</p>
+
+            {/* 邀请二维码：对方手机扫码即可加入 */}
+            <div className="flex justify-center mb-4">
+              <div className="p-3 bg-white rounded-xl shadow-sm">
+                <QRCodeSVG value={inviteUrl} size={160} level="M" />
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">扫码加入，或复制链接发给对方</p>
+
             <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg break-all text-sm">
               {inviteUrl}
             </div>
             <button
-              onClick={() => {
-                navigator.clipboard.writeText(inviteUrl).then(() => {
+              onClick={async () => {
+                const ok = await copyToClipboard(inviteUrl);
+                if (ok) {
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
-                }).catch(() => {
-                  // Fallback for HTTP or permission issues
-                  const input = document.createElement('input');
-                  input.value = inviteUrl;
-                  document.body.appendChild(input);
-                  input.select();
-                  document.execCommand('copy');
-                  document.body.removeChild(input);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                });
+                } else {
+                  alert('复制失败，请手动长按选择上方链接复制');
+                }
               }}
               className={`mt-3 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 copied

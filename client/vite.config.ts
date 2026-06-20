@@ -4,6 +4,8 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // 从项目根目录读取 .env（与后端共用同一份配置文件）
+  envDir: '..',
   server: {
     port: 5173,
     proxy: {

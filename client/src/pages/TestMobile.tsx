@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { saveRoom, getRoom } from '../utils/storage';
 import { useSocket } from '../hooks/useSocket';
 import { questions } from '../data/questions';
+import { SHOW_FILL_ALL_BUTTON } from '../config';
 import type { Answer } from '@mbti-duo/shared';
 import { getUser } from '../utils/storage';
 
@@ -37,8 +38,8 @@ export function TestMobile() {
 
   // Listen for partner's progress (both modes)
   useEffect(() => {
-    const unsub1 = on('answer-synced', ({ questionId, value }) => {
-      setPartnerAnswerCount((c) => c + 1);
+    const unsub1 = on('answer-synced', ({ questionId, value, count }) => {
+      setPartnerAnswerCount(count);
       setPartnerActiveAt(Date.now());
       if (isOpen) {
         const q = questions.find((q) => q.id === questionId);
@@ -97,7 +98,14 @@ export function TestMobile() {
       timestamp: Date.now(),
     };
 
-    const newAnswers = [...answers, answer];
+    // 按 questionId 去重：返回上一题重新作答时替换而非追加
+    const newAnswers = [...answers];
+    const existingIdx = newAnswers.findIndex((a) => a.questionId === currentQuestion.id);
+    if (existingIdx >= 0) {
+      newAnswers[existingIdx] = answer;
+    } else {
+      newAnswers.push(answer);
+    }
     setAnswers(newAnswers);
     emit('answer-submitted', { roomId: roomId!, answer });
 
@@ -122,16 +130,16 @@ export function TestMobile() {
   const progress = ((currentIndex + 1) / questions.length) * 100;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-500 to-indigo-600 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-b from-blue-500 to-indigo-600 dark:from-slate-900 dark:to-slate-950 flex flex-col transition-colors">
       {/* 顶部进度 */}
       <div className="px-4 pt-4 pb-2">
-        <div className="flex items-center justify-between text-white/80 text-sm mb-2">
+        <div className="flex items-center justify-between text-white/80 dark:text-slate-400 text-sm mb-2">
           <span>{currentIndex + 1} / {questions.length}</span>
           <span>{Math.round(progress)}%</span>
         </div>
-        <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-white/20 dark:bg-slate-700 rounded-full overflow-hidden">
           <div
-            className="h-full bg-white rounded-full transition-all duration-300"
+            className="h-full bg-white dark:bg-indigo-400 rounded-full transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -279,7 +287,7 @@ export function TestMobile() {
             setCurrentIndex(questions.length - 1);
             setSelected(null);
           }}
-          className="w-full py-2 text-amber-200/70 text-xs transition-all active:scale-95"
+          className={`w-full py-2 text-amber-200/70 text-xs transition-all active:scale-95 ${SHOW_FILL_ALL_BUTTON ? '' : 'hidden'}`}
         >
           一键填充（跳到最后一题）
         </button>

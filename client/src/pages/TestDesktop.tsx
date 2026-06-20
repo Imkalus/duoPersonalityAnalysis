@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { saveRoom, getRoom } from '../utils/storage';
 import { useSocket } from '../hooks/useSocket';
 import { questions } from '../data/questions';
+import { SHOW_FILL_ALL_BUTTON } from '../config';
 import type { Answer } from '@mbti-duo/shared';
 import { getUser } from '../utils/storage';
 
@@ -40,8 +41,8 @@ export function TestDesktop() {
 
   // Listen for partner's answer progress
   useEffect(() => {
-    const unsub1 = on('answer-synced', ({ questionId, value }) => {
-      setPartnerAnswerCount((c) => c + 1);
+    const unsub1 = on('answer-synced', ({ questionId, value, count }) => {
+      setPartnerAnswerCount(count);
       setPartnerActiveAt(Date.now());
       if (isOpen) {
         const idx = questions.findIndex((q) => q.id === questionId);
@@ -379,7 +380,7 @@ export function TestDesktop() {
           </div>
         </div>
 
-        <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
+        <div className={`p-4 border-t border-slate-200 dark:border-slate-700 space-y-2 ${SHOW_FILL_ALL_BUTTON ? '' : 'hidden'}`}>
           <button
             onClick={handleFillAll}
             className="w-full py-2 px-3 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-lg hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"

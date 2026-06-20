@@ -133,7 +133,7 @@ export interface Question {
 // ===== Socket Events =====
 export interface ServerToClientEvents {
   'partner-joined': (data: { name: string; userId: string }) => void;
-  'answer-synced': (data: { questionId: number; value: string }) => void;
+  'answer-synced': (data: { questionId: number; value: string; count: number }) => void;
   'partner-progress': (data: { count: number }) => void;
   'both-completed': () => void;
   'partner-answers': (data: { answers: Answer[] }) => void;

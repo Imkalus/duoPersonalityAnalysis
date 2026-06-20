@@ -64,6 +64,12 @@ export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToCli
         answersB: room.answers.B.length,
       });
 
+      // 补发对方当前答题进度（修复重连/页面切换后进度丢失，导致两端不同步）
+      const partnerCount = isA ? room.answers.B.length : room.answers.A.length;
+      if (partnerCount > 0) {
+        socket.emit('partner-progress', { count: partnerCount });
+      }
+
       // 同步共享对话状态（历史消息 + 当前人格 + 是否正在回复）
       socket.emit('chat-history', {
         messages: room.chat.messages,
@@ -97,22 +103,29 @@ export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToCli
       const role = socket.data.role as 'A' | 'B';
       if (!role) return;
 
-      room.answers[role].push(answer);
+      // 按 questionId 去重：返回上一题重新作答时替换而非追加，避免计数超过题目总数
+      const list = room.answers[role];
+      const idx = list.findIndex((a) => a.questionId === answer.questionId);
+      if (idx >= 0) {
+        list[idx] = answer;
+      } else {
+        list.push(answer);
+      }
 
-      // 明牌：广播题号+选择；暗牌：只广播进度数
+      const count = list.length;
+      // 明牌：广播题号+选择+权威计数；暗牌：只广播权威计数
       if (room.displayMode === 'open') {
         socket.to(roomId).emit('answer-synced', {
           questionId: answer.questionId,
           value: answer.value,
+          count,
         });
       } else {
-        socket.to(roomId).emit('partner-progress', {
-          count: room.answers[role].length,
-        });
+        socket.to(roomId).emit('partner-progress', { count });
       }
     });
 
-    // 批量提交答案（完成时）
+    // 批量提交答案（完成时）：按 questionId 去重，保留每题最后一次作答
     socket.on('answers-batch', ({ roomId, answers }) => {
       const room = roomStore.get(roomId);
       if (!room) return;
@@ -120,7 +133,9 @@ export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToCli
       const role = socket.data.role as 'A' | 'B';
       if (!role) return;
 
-      room.answers[role] = answers;
+      const deduped = new Map<number, typeof answers[number]>();
+      for (const a of answers) deduped.set(a.questionId, a);
+      room.answers[role] = Array.from(deduped.values());
     });
 
     // 完成测试
