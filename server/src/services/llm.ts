@@ -56,6 +56,7 @@ async function callLLM(
       model,
       messages,
       max_tokens: maxTokens,
+      thinking: { type: 'disabled' }, // 关闭推理模式（DeepSeek V4 模型需要显式禁用）
     }),
     signal: AbortSignal.timeout(120_000),
   });
